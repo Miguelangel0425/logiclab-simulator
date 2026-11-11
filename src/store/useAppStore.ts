@@ -87,9 +87,13 @@ export interface SharedBooleanFunction {
   expression: string;
   variableCount: number;
   variables: string[];
-  source?: 'builder' | 'circuit' | 'solver' | 'karnaugh' | 'table';
+  source?: 'builder' | 'circuit' | 'solver' | 'karnaugh' | 'table' | 'constructor' | 'truth-table';
   minterms?: number[];
+  maxterms?: number[];
   dontCares?: number[];
+  simplifiedSop?: string;
+  simplifiedPos?: string;
+  truthTable?: any;
   timestamp: number;
 }
 

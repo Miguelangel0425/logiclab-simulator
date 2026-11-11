@@ -22,7 +22,8 @@ import { MathInline } from '../math/MathInline';
 import { CircuitGenerator, SynthesisMode } from '../../engines/circuit/generator';
 import { QuineMcCluskeyEngine } from '../../engines/boolean/quineMcCluskey';
 import { KarnaughEngine } from '../../engines/karnaugh/karnaughEngine';
-import { VisualBooleanBuilder } from '../common/VisualBooleanBuilder';
+import { ConstructorFuncionBooleana } from '../common/ConstructorFuncionBooleana';
+import { BooleanLogicService } from '../../engines/boolean/booleanLogicService';
 import {
   Table,
   CheckCircle2,
@@ -383,7 +384,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
       return;
     }
     try {
-      const { components: comps, connections: conns } = CircuitGenerator.fromExpression(expr, synthesisMode);
+      const { components: comps, connections: conns } = BooleanLogicService.synthesizeCircuit(expr, synthesisMode);
       loadCircuit(comps, conns);
       setSynthesisSuccessMsg(`¡Circuito (${expr}) sintetizado exitosamente en el lienzo!`);
       showToast('success', `Circuito ${synthesisMode} sintetizado en el lienzo`);
@@ -1222,11 +1223,15 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
               {synthInputType === 'visual' ? (
                 <div className="space-y-4">
                   <div className="p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] space-y-4 shadow-xs">
-                    <VisualBooleanBuilder
+                    <ConstructorFuncionBooleana
+                      title="Constructor de Función para Síntesis de Circuito"
+                      subtitle="Construya la expresión visualmente con compuertas y complementos para transferirla al lienzo"
                       initialVariables={synthVariables}
                       initialExpression={synthVisualExpr}
-                      onExpressionChange={(expr) => setSynthVisualExpr(expr)}
-                      onSubmit={(expr) => handleSynthesizeVisualExpression(expr)}
+                      initialVarCount={synthVarCount}
+                      allowedVarCounts={[2, 3, 4, 5, 6]}
+                      onChange={(fn) => setSynthVisualExpr(fn.expression)}
+                      onApply={(fn) => handleSynthesizeVisualExpression(fn.expression)}
                     />
                   </div>
 

@@ -26,7 +26,8 @@ import {
   Wand2,
 } from 'lucide-react';
 import { BooleanExpression, MathInline } from '../components/math';
-import { VisualBooleanBuilder } from '../components/common/VisualBooleanBuilder';
+import { ConstructorFuncionBooleana } from '../components/common/ConstructorFuncionBooleana';
+import { BooleanLogicService } from '../engines/boolean/booleanLogicService';
 
 interface OutputFunction {
   id: string;
@@ -37,7 +38,7 @@ interface OutputFunction {
 }
 
 export const TruthTablePage: React.FC = () => {
-  const { setActiveTab, showToast, sharedBooleanFunction } = useAppStore();
+  const { setActiveTab, showToast, sharedBooleanFunction, setSharedBooleanFunction } = useAppStore();
   const { loadCircuit, synthesizeCircuitFromTable, generateAssociatedTruthTable } = useCircuitStore();
 
   // Mode: 'generator' | 'comparator'
@@ -414,11 +415,34 @@ export const TruthTablePage: React.FC = () => {
 
             {/* Configuration Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Variables Setup */}
-              <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xs">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-1">
-                  Variables de Entrada (Separadas por comas)
-                </label>
+              {/* Variables Setup with Quick Count Selector */}
+              <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+                    Variables de Entrada
+                  </label>
+                  <div className="flex items-center gap-1">
+                    {[2, 3, 4, 5, 6].map((cnt) => (
+                      <button
+                        key={cnt}
+                        type="button"
+                        onClick={() => {
+                          const letters = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, cnt);
+                          setVariablesInput(letters.join(', '));
+                        }}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                          numVars === cnt
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-[var(--bg-surface-sub)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        title={`Generar ${cnt} variables (${Math.pow(2, cnt)} combinaciones)`}
+                      >
+                        {cnt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <input
                   type="text"
                   value={variablesInput}
@@ -426,8 +450,9 @@ export const TruthTablePage: React.FC = () => {
                   placeholder="A, B, C, D"
                   className="w-full bg-[var(--bg-surface-sub)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs font-mono-code font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
                 />
-                <div className="text-[11px] text-[var(--text-secondary)] mt-1.5">
-                  {numVars} variables identificadas → <span className="font-bold text-blue-500">{totalRows} combinaciones</span>
+                <div className="text-[11px] text-[var(--text-secondary)] flex items-center justify-between">
+                  <span>{numVars} variables activas</span>
+                  <span className="font-bold text-blue-500">{totalRows} combinaciones (2^{numVars})</span>
                 </div>
               </div>
 
@@ -439,7 +464,7 @@ export const TruthTablePage: React.FC = () => {
                   </span>
                   <button
                     onClick={handleAddFunction}
-                    className="flex items-center gap-1 text-xs font-semibold text-blue-500 hover:text-blue-600"
+                    className="flex items-center gap-1 text-xs font-semibold text-blue-500 hover:text-blue-600 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Añadir Función</span>
@@ -503,25 +528,33 @@ export const TruthTablePage: React.FC = () => {
 
                       {editingFnId === fn.id && (
                         <div className="p-3 bg-[var(--bg-surface)] rounded-lg border border-emerald-500/40 shadow-xs">
-                          <div className="text-[11px] font-bold text-emerald-500 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                            <Wand2 className="w-3.5 h-3.5" />
-                            <span>Constructor Visual para {fn.name}</span>
-                          </div>
-                          <VisualBooleanBuilder
+                          <ConstructorFuncionBooleana
+                            title={`Constructor de Función para ${fn.name}`}
                             initialVariables={variables.slice(0, numVars)}
                             initialExpression={fn.expression}
-                            onExpressionChange={(newExpr) => {
+                            initialVarCount={numVars}
+                            allowedVarCounts={[2, 3, 4, 5, 6]}
+                            onChange={(updatedFn) => {
                               setFunctions(
-                                functions.map((f) => (f.id === fn.id ? { ...f, expression: newExpr, isManual: false } : f))
+                                functions.map((f) =>
+                                  f.id === fn.id
+                                    ? { ...f, expression: updatedFn.expression, isManual: false }
+                                    : f
+                                )
                               );
                             }}
-                            onSubmit={(newExpr) => {
+                            onApply={(updatedFn) => {
                               setFunctions(
-                                functions.map((f) => (f.id === fn.id ? { ...f, expression: newExpr, isManual: false } : f))
+                                functions.map((f) =>
+                                  f.id === fn.id
+                                    ? { ...f, expression: updatedFn.expression, isManual: false }
+                                    : f
+                                )
                               );
                               setEditingFnId(null);
                               showToast('success', `Función ${fn.name} actualizada`);
                             }}
+                            onCancel={() => setEditingFnId(null)}
                           />
                         </div>
                       )}
@@ -531,22 +564,72 @@ export const TruthTablePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Minterms & Maxterms Summary Card */}
+            {/* Minterms & Maxterms Summary Card & Cross-Tool Sync */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {functions.map((fn) => (
-                <div key={fn.id} className="p-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs space-y-1.5">
+                <div key={fn.id} className="p-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs space-y-2">
                   <div className="flex items-center justify-between font-bold flex-wrap gap-1">
                     <div className="flex items-center gap-1.5 text-blue-500 flex-wrap">
                       <span>{fn.name}:</span>
                       <BooleanExpression expression={fn.expression} className="text-xs font-bold" />
                     </div>
-                    <button
-                      onClick={() => handleSynthesizeCircuit(fn)}
-                      className="text-[11px] font-semibold text-emerald-500 hover:underline flex items-center gap-1"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      <span>Sintetizar Circuito</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const minterms = tableData.minterms[fn.id] || [];
+                          const maxterms = tableData.maxterms[fn.id] || [];
+                          const vars = variables.slice(0, numVars);
+                          setSharedBooleanFunction({
+                            expression: fn.expression,
+                            variableCount: vars.length,
+                            variables: vars,
+                            minterms,
+                            maxterms,
+                            source: 'truth-table',
+                            timestamp: Date.now(),
+                          });
+                          setActiveTab('karnaugh');
+                          showToast('info', `Función ${fn.name} transferida a Mapas de Karnaugh`);
+                        }}
+                        className="text-[11px] font-semibold text-purple-500 hover:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 cursor-pointer"
+                        title="Enviar función a Mapas de Karnaugh"
+                      >
+                        A Karnaugh
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const minterms = tableData.minterms[fn.id] || [];
+                          const maxterms = tableData.maxterms[fn.id] || [];
+                          const vars = variables.slice(0, numVars);
+                          setSharedBooleanFunction({
+                            expression: fn.expression,
+                            variableCount: vars.length,
+                            variables: vars,
+                            minterms,
+                            maxterms,
+                            source: 'truth-table',
+                            timestamp: Date.now(),
+                          });
+                          setActiveTab('boolean-solver');
+                          showToast('info', `Función ${fn.name} transferida al Simplificador Booleano`);
+                        }}
+                        className="text-[11px] font-semibold text-blue-500 hover:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 cursor-pointer"
+                        title="Enviar función al Simplificador Booleano"
+                      >
+                        Simplificar
+                      </button>
+
+                      <button
+                        onClick={() => handleSynthesizeCircuit(fn)}
+                        className="text-[11px] font-semibold text-emerald-500 hover:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Sintetizar</span>
+                      </button>
+                    </div>
                   </div>
                   <div className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1 flex-wrap">
                     <strong className="text-[var(--text-primary)]">Minterms:</strong>

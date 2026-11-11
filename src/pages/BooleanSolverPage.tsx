@@ -9,7 +9,8 @@ import { useCircuitStore } from '../store/useCircuitStore';
 import { QuineMcCluskeyEngine } from '../engines/boolean/quineMcCluskey';
 import { BooleanParser, extractVariables, evaluateAST } from '../engines/boolean/evaluator';
 import { CircuitGenerator, SynthesisMode } from '../engines/circuit/generator';
-import { VisualBooleanBuilder } from '../components/common/VisualBooleanBuilder';
+import { ConstructorFuncionBooleana } from '../components/common/ConstructorFuncionBooleana';
+import { BooleanLogicService } from '../engines/boolean/booleanLogicService';
 import {
   Sparkles,
   Cpu,
@@ -20,11 +21,13 @@ import {
   Table,
   BookOpen,
   Edit3,
+  Share2,
+  Grid,
 } from 'lucide-react';
 import { BooleanExpression, MathInline } from '../components/math';
 
 export const BooleanSolverPage: React.FC = () => {
-  const { setActiveTab, showToast, sharedBooleanFunction } = useAppStore();
+  const { setActiveTab, showToast, sharedBooleanFunction, setSharedBooleanFunction } = useAppStore();
   const { loadCircuit } = useCircuitStore();
 
   const [inputMode, setInputMode] = useState<'visual' | 'expression' | 'minterms'>('visual');
@@ -55,27 +58,16 @@ export const BooleanSolverPage: React.FC = () => {
   // Process variables and minterms
   const solverResult = useMemo(() => {
     try {
-      if (inputMode === 'expression') {
-        const parser = new BooleanParser(exprInput);
-        const ast = parser.parse();
-        const vars = extractVariables(ast);
-        if (vars.length === 0) return null;
+      if (inputMode === 'visual' || inputMode === 'expression') {
+        const cleanExpr = exprInput.trim();
+        if (!cleanExpr) return null;
 
-        const total = Math.pow(2, vars.length);
-        const minterms: number[] = [];
-
-        for (let i = 0; i < total; i++) {
-          const bin = i.toString(2).padStart(vars.length, '0');
-          const testVals: Record<string, 0 | 1> = {};
-          vars.forEach((v, idx) => {
-            testVals[v] = parseInt(bin[idx], 10) as 0 | 1;
-          });
-          const val = evaluateAST(ast, testVals);
-          if (val === 1) minterms.push(i);
-        }
-
-        const qm = new QuineMcCluskeyEngine(vars, minterms);
-        return qm.solve();
+        const fn = BooleanLogicService.createFunction(
+          cleanExpr,
+          undefined,
+          variablesInput.split(',').map((v) => v.trim()).filter(Boolean)
+        );
+        return BooleanLogicService.simplify(fn);
       } else {
         const vars = variablesInput
           .split(',')
@@ -181,13 +173,19 @@ export const BooleanSolverPage: React.FC = () => {
         <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xs space-y-4">
           {inputMode === 'visual' ? (
             <div className="space-y-3">
-              <VisualBooleanBuilder
+              <ConstructorFuncionBooleana
                 initialVariables={variablesInput.split(',').map((v) => v.trim()).filter(Boolean)}
                 initialExpression={exprInput}
-                onExpressionChange={(expr) => setExprInput(expr)}
-                onSubmit={(expr) => {
-                  setExprInput(expr);
-                  showToast('success', 'Expresión booleana validada y simplificada');
+                onChange={(fn) => {
+                  setExprInput(fn.expression);
+                  if (fn.variables.length > 0) {
+                    setVariablesInput(fn.variables.join(', '));
+                  }
+                }}
+                onApply={(fn) => {
+                  setExprInput(fn.expression);
+                  setVariablesInput(fn.variables.join(', '));
+                  showToast('success', 'Función booleana simplificada exitosamente con Quine-McCluskey');
                 }}
               />
             </div>
@@ -366,7 +364,7 @@ export const BooleanSolverPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Circuit Synthesis Selector */}
+              {/* Circuit Synthesis Selector & Cross-Tool Sync */}
               <div className="pt-4 border-t border-[var(--border-color)] flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-[var(--text-secondary)]">Tecnología de Síntesis:</span>
@@ -381,13 +379,59 @@ export const BooleanSolverPage: React.FC = () => {
                   </select>
                 </div>
 
-                <button
-                  onClick={handleSynthesize}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors"
-                >
-                  <Cpu className="w-4 h-4" />
-                  <span>Construir Circuito en el Editor</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!solverResult) return;
+                      const vars = variablesInput.split(',').map((v) => v.trim()).filter(Boolean);
+                      setSharedBooleanFunction({
+                        expression: solverResult.sopSimplified,
+                        variableCount: vars.length,
+                        variables: vars,
+                        source: 'solver',
+                        timestamp: Date.now(),
+                      });
+                      setActiveTab('truth-table');
+                      showToast('info', 'Función simplificada transferida a Tablas de Verdad');
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface-sub)] hover:bg-emerald-600/10 border border-[var(--border-color)] hover:border-emerald-500/50 text-[var(--text-primary)] hover:text-emerald-500 text-xs font-bold transition-all cursor-pointer"
+                    title="Transferir función a Tablas de Verdad"
+                  >
+                    <Table className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>A Tablas de Verdad</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!solverResult) return;
+                      const vars = variablesInput.split(',').map((v) => v.trim()).filter(Boolean);
+                      setSharedBooleanFunction({
+                        expression: solverResult.sopSimplified,
+                        variableCount: vars.length,
+                        variables: vars,
+                        source: 'solver',
+                        timestamp: Date.now(),
+                      });
+                      setActiveTab('karnaugh');
+                      showToast('info', 'Función simplificada transferida a Mapas de Karnaugh');
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface-sub)] hover:bg-purple-600/10 border border-[var(--border-color)] hover:border-purple-500/50 text-[var(--text-primary)] hover:text-purple-500 text-xs font-bold transition-all cursor-pointer"
+                    title="Transferir función a Mapas de Karnaugh"
+                  >
+                    <Grid className="w-3.5 h-3.5 text-purple-500" />
+                    <span>A Mapas de Karnaugh</span>
+                  </button>
+
+                  <button
+                    onClick={handleSynthesize}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                  >
+                    <Cpu className="w-4 h-4" />
+                    <span>Construir Circuito en el Editor</span>
+                  </button>
+                </div>
               </div>
             </div>
 
