@@ -1,0 +1,6 @@
+{
+  "name": "LogicLab — Digital Logic Simulator",
+  "description": "Simulador profesional de circuitos digitales, tablas de verdad, simplificación booleana con Quine-McCluskey, mapas de Karnaugh y generador de esquemas lógicos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
